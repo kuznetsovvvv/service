@@ -408,4 +408,18 @@ class DB {
       std::cerr << "Ошибка SQL: " << e.what() << std::endl;
     }
   }
+
+  void get_orders(db::user &obj) {
+    try {
+      pqxx::work get_orders(*conn);
+      pqxx::result result = get_orders.exec_params(
+          "SELECT * FROM orders WHERE order_id IN (SELECT order_id FROM "
+          "user_actions WHERE user_id = $1)",
+          obj.get_user_id());
+      get_orders.commit();
+
+    } catch (const pqxx::sql_error &e) {
+      std::cerr << "Ошибка SQL: " << e.what() << std::endl;
+    }
+  }
 };

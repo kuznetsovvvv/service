@@ -8,7 +8,8 @@ class courier {
   int age;
   string gender;
   string phone;
-  string active;  // Изменил тип на bool
+  string active;
+
  public:
   courier() : courier_id(0), age(0), gender(""), phone(""), active("") {}
 
@@ -28,6 +29,12 @@ class courier {
   std::string get_gender() { return gender; }
   std::string get_phone() { return phone; }
   std::string get_active() { return active; }
+
+  void set_courier_id(int id) { this->courier_id = id; }
+  void set_age(int age) { this->age = age; }
+  void set_gender(const std::string &gender) { this->gender = gender; }
+  void set_phone(const std::string &phone) { this->phone = phone; }
+  void set_active(const std::string &active) { this->active = active; }
 };
 
 class courier_action {
@@ -46,6 +53,10 @@ class courier_action {
   std::string get_action() { return action; }
   int get_order_id() { return order_id; }
   int get_courier_id() { return courier_id; }
+
+  void set_action(const std::string& action) {this->action=action;}
+  void set_order_id(int order_id) {this->order_id=order_id;}
+  void set_courier_id(int courier_id){this->courier_id=courier_id;}
 };
 
 class user {
@@ -70,6 +81,11 @@ class user {
   int get_age() { return age; }
   std::string get_gender() { return gender; }
   std::string get_phone() { return phone; }
+
+  void set_user_id(int id){this->user_id=id;}
+void set_age(int age){this->age=age;}
+void set_gender(const std::string& gender) {this->gender=gender;}
+void set_phone(const std::string& phone){this->phone=phone;}
 };
 
 class user_action {
@@ -87,6 +103,10 @@ class user_action {
   string get_action() { return action; }
   int get_order_id() { return order_id; }
   int get_user_id() { return user_id; }
+
+  void set_action(const std::string& action){this->action=action;}
+  void set_order_id(int order_id){this->order_id=order_id;}
+  void set_user_id(int user_id){this->user_id=user_id;}
 };
 
 class product {
@@ -110,6 +130,11 @@ class product {
   std::string get_name() { return name; }
   int get_price() { return price; }
   int get_count() { return count; }
+
+  void set_product_id(int id) { this->product_id = id; }
+  void set_name(const std::string &name) { this->name = name; }
+  void set_price(int price) { this->price = price; }
+  void set_count(int count) { this->count = count; }
 };
 
 class order {
@@ -145,6 +170,12 @@ class order {
   std::string get_time() { return time; }
   std::string get_delivery_address() { return delivery_address; }
   std::string get_status() { return status; }
+
+  void set_order_id(int id){this->order_id=id;}
+  void set_creation_time(const std::string& creation_time) {this->creation_time=creation_time;}
+  void set_time(const std::string& time){this->time=time;}
+  void set_delivery_address(const std::string& delivery_address){this->delivery_address=delivery_address;}
+  void set_status(const std::string& status){this->status=status;}
 };
 
 class content {

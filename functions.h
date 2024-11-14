@@ -5,6 +5,7 @@
 #include <cctype>
 #include <iostream>
 #include <memory>
+#include <optional>
 #include <pqxx/pqxx>
 #include <string>
 #include <string_view>
@@ -26,8 +27,7 @@ class DB {
     conn = shared_ptr<pqxx::connection>(new pqxx::connection(dsn.data()));
   }
 
-  void add_courier(db::courier &obj) {
-    // Добавление элемента в таблицу
+  std::optional<int> add_courier(db::courier &obj) {
     try {
       pqxx::work ad_courier(*conn);
       ad_courier.exec_params(
@@ -35,12 +35,14 @@ class DB {
           "VALUES (DEFAULT, $1, $2, $3, $4)",
           obj.get_age(), obj.get_gender(), obj.get_phone(), obj.get_active());
       ad_courier.commit();
+      return obj.get_courier_id();
     } catch (const pqxx::sql_error &e) {
-      std::cerr << "Ошибка SQL: " << e.what() << std::endl;
+      throw std::runtime_error("Ошибка добавления курьера: " +
+                               std::string(e.what()));
     }
   }
-  //
-  void add_order(db::order &obj) {
+
+  std::optional<int> add_order(db::order &obj) {
     try {
       pqxx::work createOrder(*conn);
       createOrder.exec_params(
@@ -49,13 +51,14 @@ class DB {
           "CURRENT_TIMESTAMP(2), $1, $2)",
           obj.get_delivery_address(), "accepted");
       createOrder.commit();
+      return obj.get_order_id();
     } catch (const pqxx::sql_error &e) {
-      std::cerr << "Ошибка SQL: " << e.what() << std::endl;
+      throw std::runtime_error("Ошибка создания заказа: " +
+                               std::string(e.what()));
     }
   }
 
-  void add_product(db::product &obj) {
-    // Добавление элемента в таблицу
+  std::optional<int> add_product(db::product &obj) {
     try {
       pqxx::work ad_product(*conn);
       ad_product.exec_params(
@@ -63,12 +66,14 @@ class DB {
           "(DEFAULT, $1, $2, $3)",
           obj.get_name(), obj.get_price(), obj.get_count());
       ad_product.commit();
+      return obj.get_product_id();
     } catch (const pqxx::sql_error &e) {
-      std::cerr << "Ошибка SQL: " << e.what() << std::endl;
+      throw std::runtime_error("Ошибка создания продукта:" +
+                               std::string(e.what()));
     }
   }
 
-  void add_user(db::user &obj) {
+  std::optional<int> add_user(db::user &obj) {
     try {
       pqxx::work ad_user(*conn);
       ad_user.exec_params(
@@ -76,8 +81,10 @@ class DB {
           "$1, $2, $3)",
           obj.get_age(), obj.get_gender(), obj.get_phone());
       ad_user.commit();
+      return obj.get_user_id();
     } catch (const pqxx::sql_error &e) {
-      std::cerr << "Ошибка SQL: " << e.what() << std::endl;
+      throw std::runtime_error("Ошибка создания пользователя:" +
+                               std::string(e.what()));
     }
   }
 
@@ -90,7 +97,8 @@ class DB {
           obj.get_action(), obj.get_order_id(), obj.get_courier_id());
       transfer.commit();
     } catch (const pqxx::sql_error &e) {
-      std::cerr << "Ошибка SQL: " << e.what() << std::endl;
+      throw std::runtime_error("Ошибка создания действия курьера:" +
+                               std::string(e.what()));
     }
   }
 
@@ -103,7 +111,8 @@ class DB {
           obj.get_action(), obj.get_order_id(), obj.get_user_id());
       transfer.commit();
     } catch (const pqxx::sql_error &e) {
-      std::cerr << "Ошибка SQL: " << e.what() << std::endl;
+      throw std::runtime_error("Ошибка создания действия пользователя:" +
+                               std::string(e.what()));
     }
   }
 
@@ -116,11 +125,13 @@ class DB {
           obj.get_order_id(), obj.get_product_id());
       transfer.commit();
     } catch (const pqxx::sql_error &e) {
-      std::cerr << "Ошибка SQL: " << e.what() << std::endl;
+      throw std::runtime_error(
+          "Ошибка создания создания записи содержимого заказа:" +
+          std::string(e.what()));
     }
   }
 
-  void update_courier(db::courier &obj) {
+  bool update_courier(db::courier &obj) {
     try {
       pqxx::work check(*conn);
       pqxx::result result = check.exec_params(
@@ -135,39 +146,40 @@ class DB {
             obj.get_age(), obj.get_phone(), obj.get_active(),
             obj.get_courier_id());
         update.commit();
+        return true;
+      } else {
+        return false;
       }
-
     } catch (const pqxx::sql_error &e) {
-      std::cerr << "Ошибка SQL: " << e.what() << std::endl;
-    } catch (const std::exception &e) {
-      std::cerr << "Ошибка: " << e.what() << std::endl;
+      throw std::runtime_error("Ошибка обновления курьера:" +
+                               std::string(e.what()));
     }
   }
-
-  void update_courier_status(db::courier &obj) {
+  //?
+  bool update_courier_status(db::courier &obj) {
     try {
-      // Проверка существования курьера
       pqxx::work check(*conn);
       pqxx::result result = check.exec_params(
           "SELECT EXISTS (SELECT 1 FROM couriers WHERE courier_id = $1)",
           obj.get_courier_id());
       check.commit();
       if (result[0][0].as<bool>()) {
-        return;
-      } else {
-        // Удаление курьера
         pqxx::work delete_cour(*conn);
         delete_cour.exec_params(
             "UPDATE couriers SET status=$1 WHERE courier_id=$2",
             obj.get_active(), obj.get_courier_id());
         delete_cour.commit();
+        return true;
+      } else {
+        return false;
       }
     } catch (const pqxx::sql_error &e) {
-      std::cerr << "Ошибка SQL: " << e.what() << std::endl;
+      throw std::runtime_error("Ошибка обновления статуса курьера:" +
+                               std::string(e.what()));
     }
   }
-
-  void update_product(db::product &obj) {
+  //?
+  bool update_product(db::product &obj) {
     try {
       pqxx::work check(*conn);
       pqxx::result result = check.exec_params(
@@ -182,42 +194,40 @@ class DB {
             obj.get_name(), obj.get_price(), obj.get_count(),
             obj.get_product_id());
         update.commit();
+        return true;
       } else {
-        return;
+        return false;
       }
     } catch (const pqxx::sql_error &e) {
-      std::cerr << "Ошибка SQL: " << e.what() << std::endl;
-    } catch (const std::exception &e) {
-      std::cerr << "Ошибка: " << e.what() << std::endl;
+      throw std::runtime_error("Ошибка обновления продукта:" +
+                               std::string(e.what()));
     }
   }
 
-  void update_product_status(db::product &obj) {
+  bool update_product_status(db::product &obj) {
     try {
-      // Проверка существования продукта
       pqxx::work check(*conn);
       pqxx::result result = check.exec_params(
           "SELECT EXISTS (SELECT 1 FROM products WHERE product_id = $1)",
           obj.get_name());
       check.commit();
       if (result[0][0].as<bool>()) {
-        return;
-      } else {
-        // Удаление продукта
-        pqxx::work delete_prod(*conn);
-        delete_prod.exec_params(
+        pqxx::work update_status(*conn);
+        update_status.exec_params(
             "UPDATE products SET count=0 WHERE product_id=$1",
             obj.get_product_id());
-        delete_prod.commit();
+        update_status.commit();
+        return true;
+      } else {
+        return false;
       }
     } catch (const pqxx::sql_error &e) {
-      std::cerr << "Ошибка SQL: " << e.what() << std::endl;
-    } catch (const std::exception &e) {
-      std::cerr << "Ошибка: " << e.what() << std::endl;
+      throw std::runtime_error("Ошибка обновления статуса продукта:" +
+                               std::string(e.what()));
     }
   }
 
-  void update_user(db::user &obj) {
+  bool update_user(db::user &obj) {
     try {
       pqxx::work check(*conn);
       pqxx::result result = check.exec_params(
@@ -230,17 +240,18 @@ class DB {
             "UPDATE users SET age=$1, phone=$2 WHERE user_id=$3", obj.get_age(),
             obj.get_phone(), obj.get_user_id());
         update.commit();
+        return true;
+      } else {
+        return false;
       }
     } catch (const pqxx::sql_error &e) {
-      std::cerr << "Ошибка SQL: " << e.what() << std::endl;
-    } catch (const std::exception &e) {
-      std::cerr << "Ошибка: " << e.what() << std::endl;
+      throw std::runtime_error("Ошибка обновления пользователя:" +
+                               std::string(e.what()));
     }
   }
 
-  void update_order_status(db::order &obj) {
+  bool update_order_status(db::order &obj) {
     try {
-      // Проверка существования курьера
       pqxx::work check(*conn);
       pqxx::result result = check.exec_params(
           "SELECT EXISTS (SELECT 1 FROM orders WHERE order_id = $1)",
@@ -254,18 +265,19 @@ class DB {
             "order_id=$2",
             obj.get_status(), obj.get_order_id());
         update_data.commit();
+        return true;
       } else {
-        return;
+        return false;
       }
 
     } catch (const pqxx::sql_error &e) {
-      std::cerr << "Ошибка SQL: " << e.what() << std::endl;
+      throw std::runtime_error("Ошибка обновления статуса заказа:" +
+                               std::string(e.what()));
     }
   }
-
-  void get_info_courier(db::courier &obj) {
+  
+  std::optional<db::courier> get_info_courier(db::courier &obj) {
     try {
-      // Проверка существования курьера
       pqxx::work check(*conn);
       pqxx::result result = check.exec_params(
           "SELECT EXISTS (SELECT 1 FROM couriers WHERE courier_id = $1)",
@@ -277,17 +289,23 @@ class DB {
             get_info.exec_params("SELECT * FROM couriers WHERE courier_id = $1",
                                  obj.get_courier_id());
         get_info.commit();
+        db::courier courier;
+        courier.set_courier_id(result[0][0].as<int>());
+        courier.set_age(result[0][1].as<int>());
+        courier.set_gender(result[0][2].as<std::string>());
+        courier.set_phone(result[0][3].as<std::string>());
+        courier.set_active(result[0][4].as<std::string>());
+        return courier;
       } else {
-        return;
+        return std::nullopt;
       }
     } catch (const pqxx::sql_error &e) {
-      std::cerr << "Ошибка SQL: " << e.what() << std::endl;
-    } catch (const std::exception &e) {
-      std::cerr << "Ошибка: " << e.what() << std::endl;
+      throw std::runtime_error("Ошибка получения информации о курьере:" +
+                               std::string(e.what()));
     }
   }
 
-  void get_info_product(db::product &obj) {
+  std::optional<db::product> get_info_product(db::product &obj) {
     try {
       pqxx::work check(*conn);
       pqxx::result result = check.exec_params(
@@ -299,17 +317,23 @@ class DB {
         pqxx::result res = get.exec_params(
             "SELECT * FROM products WHERE name=$1", obj.get_name());
         get.commit();
+        db::product product;
+        product.set_product_id(res[0][0].as<int>());
+        product.set_name(res[0][1].as<std::string>());
+        product.set_price(res[0][2].as<int>());
+        product.set_count(res[0][3].as<int>());
+        return product;
+      } else {
+        return std::nullopt;
       }
     } catch (const pqxx::sql_error &e) {
-      std::cerr << "Ошибка SQL: " << e.what() << std::endl;
-    } catch (std::exception &e) {
-      cout << e.what() << endl;
+      throw std::runtime_error("Ошибка получения информации о продукте:" +
+                               std::string(e.what()));
     }
   }
 
-  void get_info_user(db::user &obj) {
+  std::optional<db::user> get_info_user(db::user &obj) {
     try {
-      // Проверка существования курьера
       pqxx::work check(*conn);
       pqxx::result result = check.exec_params(
           "SELECT EXISTS (SELECT 1 FROM users WHERE user_id = $1)",
@@ -320,17 +344,22 @@ class DB {
         pqxx::result result = get_info.exec_params(
             "SELECT * FROM users WHERE user_id = $1", obj.get_user_id());
         get_info.commit();
+        db::user user;
+        user.set_user_id(result[0][0].as<int>());
+        user.set_age(result[0][1].as<int>());
+        user.set_gender(result[0][2].as<std::string>());
+        user.set_phone(result[0][3].as<std::string>());
+        return user;
       } else {
-        return;
+        return std::nullopt;
       }
     } catch (const pqxx::sql_error &e) {
-      std::cerr << "Ошибка SQL: " << e.what() << std::endl;
-    } catch (const std::exception &e) {
-      std::cerr << "Ошибка: " << e.what() << std::endl;
+      throw std::runtime_error("Ошибка получения информации о пользователе:" +
+                               std::string(e.what()));
     }
   }
 
-  void get_info_order(db::order &obj) {
+  std::optional<db::order> get_info_order(db::order &obj) {
     try {
       pqxx::work check(*conn);
       pqxx::result result = check.exec_params(
@@ -342,27 +371,44 @@ class DB {
         pqxx::result result = get_info.exec_params(
             "SELECT * FROM orders WHERE order_id = $1", obj.get_order_id());
         get_info.commit();
+        db::order order;
+        order.set_order_id(result[0][0].as<int>());
+        order.set_creation_time(result[0][1].as<std::string>());
+        order.set_time(result[0][2].as<std::string>());
+        order.set_delivery_address(result[0][3].as<std::string>());
+        order.set_status(result[0][4].as<std::string>());
+        return order;
       } else {
-        return;
+        return std::nullopt;
       }
     } catch (const pqxx::sql_error &e) {
-      std::cerr << "Ошибка SQL: " << e.what() << std::endl;
-    } catch (const std::exception &e) {
-      std::cerr << "Ошибка: " << e.what() << std::endl;
+      throw std::runtime_error("Ошибка получения информации о заказе:" +
+                               std::string(e.what()));
     }
   }
 
-  void get_info_all_products() {
+  std::optional<std::vector<db::product>> get_info_all_products() {
     try {
       pqxx::work get(*conn);
       pqxx::result res = get.exec_params("SELECT * FROM products ");
       get.commit();
+      vector<db::product> products;
+      for (const auto &row : res) {
+        db::product product;
+        product.set_product_id(res[0][0].as<int>());
+        product.set_name(res[0][1].as<std::string>());
+        product.set_price(res[0][2].as<int>());
+        product.set_count(res[0][3].as<int>());
+        products.push_back(product);
+      }
+      return products;
     } catch (const pqxx::sql_error &e) {
-      std::cerr << "Ошибка SQL: " << e.what() << std::endl;
+      throw std::runtime_error("Ошибка получения информации о всех продуктах:" +
+                               std::string(e.what()));
     }
   }
 
-  void get_info_user_action(db::user_action &obj) {
+  std::optional<db::user_action> get_info_user_action(db::user_action &obj) {
     try {
       pqxx::work check(*conn);
       pqxx::result result = check.exec_params(
@@ -377,15 +423,23 @@ class DB {
             "user_id = $2",
             obj.get_order_id());
         get_info.commit();
+        db::user_action user_action;
+        user_action.set_action(result[0][0].as<std::string>());
+        user_action.set_order_id(result[0][1].as<int>());
+        user_action.set_user_id(result[0][2].as<int>());
+        return user_action;
       } else {
-        return;
+        return std::nullopt;
       }
     } catch (const pqxx::sql_error &e) {
-      std::cerr << "Ошибка SQL: " << e.what() << std::endl;
+      throw std::runtime_error(
+          "Ошибка получения информации о действии пользователя:" +
+          std::string(e.what()));
     }
   }
 
-  void get_info_courier_action(db::courier_action &obj) {
+  std::optional<db::courier_action> get_info_courier_action(
+      db::courier_action &obj) {
     try {
       pqxx::work check(*conn);
       pqxx::result result = check.exec_params(
@@ -401,15 +455,22 @@ class DB {
             "courier_id = $2",
             obj.get_order_id());
         get_info.commit();
+        db::courier_action courier_action;
+        courier_action.set_action(result[0][0].as<std::string>());
+        courier_action.set_order_id(result[0][1].as<int>());
+        courier_action.set_courier_id(result[0][2].as<int>());
+        return courier_action;
       } else {
-        return;
+        return std::nullopt;
       }
     } catch (const pqxx::sql_error &e) {
-      std::cerr << "Ошибка SQL: " << e.what() << std::endl;
+      throw std::runtime_error(
+          "Ошибка получения информации о действии курьера:" +
+          std::string(e.what()));
     }
   }
 
-  void get_orders(db::user &obj) {
+  std::optional<vector<db::order>> get_orders(db::user &obj) {
     try {
       pqxx::work get_orders(*conn);
       pqxx::result result = get_orders.exec_params(
@@ -417,9 +478,21 @@ class DB {
           "user_actions WHERE user_id = $1)",
           obj.get_user_id());
       get_orders.commit();
+      vector<db::order> orders;
+      for (const auto &row : result) {
+        db::order order;
+        order.set_order_id(result[0][0].as<int>());
+        order.set_creation_time(result[0][1].as<std::string>());
+        order.set_time(result[0][2].as<std::string>());
+        order.set_delivery_address(result[0][3].as<std::string>());
+        order.set_status(result[0][4].as<std::string>());
+        orders.push_back(order);
+      }
+      return orders;
 
     } catch (const pqxx::sql_error &e) {
-      std::cerr << "Ошибка SQL: " << e.what() << std::endl;
+      throw std::runtime_error("Ошибка получения заказов пользователя:" +
+                               std::string(e.what()));
     }
   }
 };

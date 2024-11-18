@@ -1,3 +1,4 @@
+#define CROW_USE_BOOST 1
 #include <crow_all.h>
 #include <stdio.h>
 
@@ -36,15 +37,67 @@ auto establish_pgconnection(std::string_view dsn) -> pqxx::connection {
   return pqxx::connection(dsn.data());
 }
 
-void Guest();
-void User();
-void Admin();
 
 int main(int argc, char** argv) {
   auto vm = get_args(argc, argv);
   auto dsn = vm["pgdsn"].as<std::string>();
   
   DB postgres("postgres", dsn);
+
+
+crow::App<crow::CORSHandler> app;
+auto& cors = app.get_middleware<crow::CORSHandler>();
+
+    app.port(18080).run();
+
+//Добавить курьера
+ CROW_ROUTE(app, "/api/couriers")
+ .methods(crow::HTTPMethod::OPTIONS)
+ ([&postgres](const crow::request& req){
+//парсинг json
+try {
+        if (req.method != crow::HTTPMethod::POST) {
+            return crow::response(405, "Method Not Allowed");
+        }
+
+        auto json = crow::json::load(req.body);
+        if(!json.has("age") || !json.has("gender") || !json.has("phone") || !json.has("active")){
+            return crow::response(400, "Missing required fields");
+        }
+
+        int age = json["age"].i();
+        string gender = json["gender"].s();
+        string phone = json["phone"].s();
+        string active = json["active"].s(); // Преобразуем в bool
+
+        db::courier courier1(1, age, gender, phone, active); 
+
+        postgres.add_courier(courier1);
+        return crow::response(201, crow::json::wvalue( {{"message", "Courier added"}} )); // Возвращаем JSON ответ
+    } catch (const exception& e) {
+        cerr << "Error: " << e.what() << endl;
+        return crow::response(500, "Internal Server Error");
+    }
+
+    });
+
+
+
+   
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -65,7 +118,7 @@ int main(int argc, char** argv) {
 
   // postgres.all_products();
 
-  db::product product1(2);
+  //db::product product1(2);
   // postgres.update_product(product1);
 
   // db::courier courier1(1,30,"m","89834342","+");
@@ -73,9 +126,12 @@ int main(int argc, char** argv) {
   // db::user user1(1,50,"m","8987654335");
   // postgres.update_user(user1);
 
-  std::cout << "Конец работы с базой данных" << std::endl;
   return 0;
 }
+
+void Guest();
+void User();
+void Admin();
 
 void Guest() {
   std::cout << "1.Зарегистрироваться" << std::endl;  //+

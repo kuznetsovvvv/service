@@ -26,7 +26,7 @@ class DB {
     DB_NAME = db_name;
     conn = shared_ptr<pqxx::connection>(new pqxx::connection(dsn.data()));
   }
-
+//+
   std::optional<int> add_courier(db::courier &obj) {
     try {
       pqxx::work ad_courier(*conn);
@@ -41,7 +41,7 @@ class DB {
                                std::string(e.what()));
     }
   }
-
+//+
   std::optional<int> add_order(db::order &obj) {
     try {
       pqxx::work createOrder(*conn);
@@ -57,7 +57,7 @@ class DB {
                                std::string(e.what()));
     }
   }
-
+//+
   std::optional<int> add_product(db::product &obj) {
     try {
       pqxx::work ad_product(*conn);
@@ -72,7 +72,7 @@ class DB {
                                std::string(e.what()));
     }
   }
-
+//+
   std::optional<int> add_user(db::user &obj) {
     try {
       pqxx::work ad_user(*conn);
@@ -130,7 +130,7 @@ class DB {
           std::string(e.what()));
     }
   }
-
+//+
   bool update_courier(db::courier &obj) {
     try {
       pqxx::work check(*conn);
@@ -155,7 +155,7 @@ class DB {
                                std::string(e.what()));
     }
   }
-  //?
+//+
   bool update_courier_status(db::courier &obj) {
     try {
       pqxx::work check(*conn);
@@ -166,7 +166,7 @@ class DB {
       if (result[0][0].as<bool>()) {
         pqxx::work delete_cour(*conn);
         delete_cour.exec_params(
-            "UPDATE couriers SET status=$1 WHERE courier_id=$2",
+            "UPDATE couriers SET active=$1 WHERE courier_id=$2",
             obj.get_active(), obj.get_courier_id());
         delete_cour.commit();
         return true;
@@ -178,7 +178,7 @@ class DB {
                                std::string(e.what()));
     }
   }
-  //?
+//+
   bool update_product(db::product &obj) {
     try {
       pqxx::work check(*conn);
@@ -203,7 +203,7 @@ class DB {
                                std::string(e.what()));
     }
   }
-
+//+
   bool update_product_status(db::product &obj) {
     try {
       pqxx::work check(*conn);
@@ -226,7 +226,7 @@ class DB {
                                std::string(e.what()));
     }
   }
-
+//+
   bool update_user(db::user &obj) {
     try {
       pqxx::work check(*conn);
@@ -275,7 +275,7 @@ class DB {
                                std::string(e.what()));
     }
   }
-  
+//+
   std::optional<db::courier> get_info_courier(db::courier &obj) {
     try {
       pqxx::work check(*conn);
@@ -304,7 +304,7 @@ class DB {
                                std::string(e.what()));
     }
   }
-
+//+
   std::optional<db::product> get_info_product(db::product &obj) {
     try {
       pqxx::work check(*conn);
@@ -331,18 +331,18 @@ class DB {
                                std::string(e.what()));
     }
   }
-
+//+
   std::optional<db::user> get_info_user(db::user &obj) {
     try {
       pqxx::work check(*conn);
       pqxx::result result = check.exec_params(
-          "SELECT EXISTS (SELECT 1 FROM users WHERE user_id = $1)",
-          obj.get_user_id());
+          "SELECT EXISTS (SELECT 1 FROM users WHERE phone = $1)",
+          obj.get_phone());
       check.commit();
       if (result[0][0].as<bool>()) {
         pqxx::work get_info(*conn);
         pqxx::result result = get_info.exec_params(
-            "SELECT * FROM users WHERE user_id = $1", obj.get_user_id());
+            "SELECT * FROM users WHERE phone = $1", obj.get_phone());
         get_info.commit();
         db::user user;
         user.set_user_id(result[0][0].as<int>());
@@ -358,7 +358,7 @@ class DB {
                                std::string(e.what()));
     }
   }
-
+//+
   std::optional<db::order> get_info_order(db::order &obj) {
     try {
       pqxx::work check(*conn);
@@ -438,8 +438,7 @@ class DB {
     }
   }
 
-  std::optional<db::courier_action> get_info_courier_action(
-      db::courier_action &obj) {
+  std::optional<db::courier_action> get_info_courier_action(db::courier_action &obj) {
     try {
       pqxx::work check(*conn);
       pqxx::result result = check.exec_params(
@@ -495,4 +494,22 @@ class DB {
                                std::string(e.what()));
     }
   }
+
+std::optional<db::order> get_last_order(db::order& obj){
+try {
+      pqxx::work get_orders(*conn);
+      pqxx::result result = get_orders.exec_params(
+        "SELECT product_id, delivery_address FROM orders WHERE delivery_address = $1 ORDER BY product_id DESC LIMIT 1",
+        obj.get_delivery_address());
+      get_orders.commit();
+      int product_id = result[0]["product_id"].as<int>();
+     db::order order2(product_id,obj.get_delivery_address());
+      return order2;
+
+    } catch (const pqxx::sql_error &e) {
+      throw std::runtime_error("Ошибка получения заказов пользователя:" +
+                               std::string(e.what()));
+    }
+
+}
 };

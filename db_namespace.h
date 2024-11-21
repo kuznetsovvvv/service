@@ -16,6 +16,9 @@ class courier {
   courier(const int &id)
       : courier_id(id), age(0), gender(""), phone(""), active("") {}
 
+  courier(const int &id,const string &active)
+      : courier_id(id), age(0), gender(""), phone(""), active(active) {}
+
   courier(const int &id, const int &age, const string &gender,
           const string &phone, const string &active)
       : courier_id(id),
@@ -69,10 +72,9 @@ class user {
  public:
   user() : user_id(0), age(0), gender(""), phone("") {}
 
-  user(const int &id) : user_id(id), age(0), gender(""), phone("") {}
+  user(const string &phone) : user_id(0), age(0), gender(""), phone(phone) {}
 
-  user(const int &age, const string &gender, const string &phone)
-      : age(age), gender(gender), phone(phone) {}
+  user(const int &id,const string &phone) : user_id(id), age(0), gender(""), phone(phone) {}
 
   user(const int &id, const int &age, const string &gender, const string &phone)
       : user_id(id), age(age), gender(gender), phone(phone) {}
@@ -121,8 +123,8 @@ class product {
 
   product(const int &id) : product_id(id), name(""), price(0), count(0) {}
 
-  product(const string &name, const int &price, const int &count)
-      : name(name), price(price), count(count) {}
+  product(const int &id,const string &name, const int &price, const int &count)
+      : product_id(id), name(name), price(price), count(count) {}
 
   product(const string &name) : name(name) {}
 

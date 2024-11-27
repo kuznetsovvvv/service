@@ -1,4 +1,4 @@
-#pragma once
+
 #include <stdio.h>
 
 #include <boost/program_options.hpp>
@@ -26,64 +26,113 @@ class DB {
     DB_NAME = db_name;
     conn = shared_ptr<pqxx::connection>(new pqxx::connection(dsn.data()));
   }
-//+
+  //+
   std::optional<int> add_courier(db::courier &obj) {
     try {
-      pqxx::work ad_courier(*conn);
-      ad_courier.exec_params(
-          "INSERT INTO couriers (courier_id, age, gender, phone, active) "
-          "VALUES (DEFAULT, $1, $2, $3, $4)",
-          obj.get_age(), obj.get_gender(), obj.get_phone(), obj.get_active());
-      ad_courier.commit();
-      return obj.get_courier_id();
+      pqxx::work check(*conn);
+      pqxx::result check_result = check.exec_params(
+          "SELECT EXISTS (SELECT 1 FROM couriers WHERE phone = $1)",
+          obj.get_phone());
+      check.commit();
+      if (check_result[0][0].as<bool>()) {
+        return std::nullopt;
+      } else {
+        pqxx::work ad_courier(*conn);
+        pqxx::result result = ad_courier.exec_params(
+            "INSERT INTO couriers (courier_id, age, gender, phone, active) "
+            "VALUES (DEFAULT, $1, $2, $3, $4) RETURNING courier_id",
+            obj.get_age(), obj.get_gender(), obj.get_phone(), obj.get_active());
+        ad_courier.commit();
+        int courier_id;
+        courier_id = result[0][0].as<int>();
+        return courier_id;
+      }
     } catch (const pqxx::sql_error &e) {
       throw std::runtime_error("Ошибка добавления курьера: " +
                                std::string(e.what()));
     }
   }
-//+
+  //+
   std::optional<int> add_order(db::order &obj) {
     try {
       pqxx::work createOrder(*conn);
-      createOrder.exec_params(
+      pqxx::result result = createOrder.exec_params(
           "INSERT INTO orders (order_id, creation_time, time, "
           "delivery_address, status) VALUES (DEFAULT, CURRENT_TIMESTAMP(2), "
-          "CURRENT_TIMESTAMP(2), $1, $2)",
+          "CURRENT_TIMESTAMP(2), $1, $2) RETURNING order_id",
           obj.get_delivery_address(), "accepted");
       createOrder.commit();
-      return obj.get_order_id();
+      int order_id;
+      order_id = result[0][0].as<int>();
+      return order_id;
     } catch (const pqxx::sql_error &e) {
       throw std::runtime_error("Ошибка создания заказа: " +
                                std::string(e.what()));
     }
   }
-//+
+  //+
   std::optional<int> add_product(db::product &obj) {
     try {
       pqxx::work ad_product(*conn);
-      ad_product.exec_params(
+      pqxx::result result = ad_product.exec_params(
           "INSERT INTO products (product_id, name, price, count) VALUES "
-          "(DEFAULT, $1, $2, $3)",
+          "(DEFAULT, $1, $2, $3) RETURNING product_id",
           obj.get_name(), obj.get_price(), obj.get_count());
       ad_product.commit();
-      return obj.get_product_id();
+      int product_id;
+      product_id = result[0][0].as<int>();
+      return product_id;
     } catch (const pqxx::sql_error &e) {
       throw std::runtime_error("Ошибка создания продукта:" +
                                std::string(e.what()));
     }
   }
-//+
+  //+
   std::optional<int> add_user(db::user &obj) {
     try {
-      pqxx::work ad_user(*conn);
-      ad_user.exec_params(
-          "INSERT INTO users (user_id, age, gender, phone) VALUES (DEFAULT, "
-          "$1, $2, $3)",
-          obj.get_age(), obj.get_gender(), obj.get_phone());
-      ad_user.commit();
-      return obj.get_user_id();
+      pqxx::work check(*conn);
+      pqxx::result check_result = check.exec_params(
+          "SELECT EXISTS (SELECT 1 FROM users WHERE phone = $1)",
+          obj.get_phone());
+      check.commit();
+      if (check_result[0][0].as<bool>()) {
+        return std::nullopt;
+      } else {
+        pqxx::work ad_user(*conn);
+        pqxx::result result = ad_user.exec_params(
+            "INSERT INTO users (user_id, age, gender, phone) VALUES (DEFAULT, "
+            "$1, $2, $3) RETURNING user_id",
+            obj.get_age(), obj.get_gender(), obj.get_phone());
+        ad_user.commit();
+        int user_id;
+        user_id = result[0][0].as<int>();
+        return user_id;
+      }
     } catch (const pqxx::sql_error &e) {
       throw std::runtime_error("Ошибка создания пользователя:" +
+                               std::string(e.what()));
+    }
+  }
+
+  bool add_password(db::user_password &obj) {
+    try {
+      pqxx::work check(*conn);
+      pqxx::result check_result = check.exec_params(
+          "SELECT EXISTS (SELECT 1 FROM passwords WHERE phone = $1)",
+          obj.get_phone());
+      check.commit();
+      if (check_result[0][0].as<bool>()) {
+       return false;
+      } else {
+        pqxx::work ad_password(*conn);
+        pqxx::result result = ad_password.exec_params(
+            "INSERT INTO passwords (phone, password) VALUES ($1, $2)",
+            obj.get_phone(), obj.get_password());
+        ad_password.commit();
+        return true;
+      }
+    } catch (const pqxx::sql_error &e) {
+      throw std::runtime_error("Ошибка добавления пароля: " +
                                std::string(e.what()));
     }
   }
@@ -130,7 +179,7 @@ class DB {
           std::string(e.what()));
     }
   }
-//+
+  //+
   bool update_courier(db::courier &obj) {
     try {
       pqxx::work check(*conn);
@@ -155,7 +204,7 @@ class DB {
                                std::string(e.what()));
     }
   }
-//+
+  //+
   bool update_courier_status(db::courier &obj) {
     try {
       pqxx::work check(*conn);
@@ -178,7 +227,7 @@ class DB {
                                std::string(e.what()));
     }
   }
-//+
+  //+
   bool update_product(db::product &obj) {
     try {
       pqxx::work check(*conn);
@@ -203,7 +252,7 @@ class DB {
                                std::string(e.what()));
     }
   }
-//+
+  //+
   bool update_product_status(db::product &obj) {
     try {
       pqxx::work check(*conn);
@@ -226,20 +275,26 @@ class DB {
                                std::string(e.what()));
     }
   }
-//+
-  bool update_user(db::user &obj) {
+  //+
+  bool update_user(db::user &obj,std::string &old_phone) {
     try {
       pqxx::work check(*conn);
       pqxx::result result = check.exec_params(
-          "SELECT EXISTS (SELECT 1 FROM users WHERE user_id = $1)",
-          obj.get_user_id());
+          "SELECT EXISTS (SELECT 1 FROM users WHERE phone = $1)",
+          old_phone);
       check.commit();
       if (result[0][0].as<bool>()) {
+        pqxx::work update_in_passwords(*conn);
+        pqxx::result ress=update_in_passwords.exec_params(
+          "UPDATE passwords SET phone=$1 WHERE phone IN (SELECT phone FROM users WHERE phone = $2)",obj.get_phone(),old_phone);
+        update_in_passwords.commit();
+
         pqxx::work update(*conn);
         pqxx::result res = update.exec_params(
-            "UPDATE users SET age=$1, phone=$2 WHERE user_id=$3", obj.get_age(),
-            obj.get_phone(), obj.get_user_id());
+            "UPDATE users SET age=$1, phone=$2 WHERE phone=$3", obj.get_age(),
+            obj.get_phone(), old_phone);
         update.commit();
+       
         return true;
       } else {
         return false;
@@ -275,7 +330,7 @@ class DB {
                                std::string(e.what()));
     }
   }
-//+
+  //+
   std::optional<db::courier> get_info_courier(db::courier &obj) {
     try {
       pqxx::work check(*conn);
@@ -304,7 +359,7 @@ class DB {
                                std::string(e.what()));
     }
   }
-//+
+  //+
   std::optional<db::product> get_info_product(db::product &obj) {
     try {
       pqxx::work check(*conn);
@@ -331,7 +386,7 @@ class DB {
                                std::string(e.what()));
     }
   }
-//+
+  //+
   std::optional<db::user> get_info_user(db::user &obj) {
     try {
       pqxx::work check(*conn);
@@ -358,7 +413,7 @@ class DB {
                                std::string(e.what()));
     }
   }
-//+
+  //+
   std::optional<db::order> get_info_order(db::order &obj) {
     try {
       pqxx::work check(*conn);
@@ -438,7 +493,7 @@ class DB {
     }
   }
 
-  std::optional<db::courier_action> get_info_courier_action(db::courier_action &obj) {
+  std::optional<db::courier_action> get_info_courier_action( db::courier_action &obj) {
     try {
       pqxx::work check(*conn);
       pqxx::result result = check.exec_params(
@@ -495,21 +550,30 @@ class DB {
     }
   }
 
-std::optional<db::order> get_last_order(db::order& obj){
-try {
-      pqxx::work get_orders(*conn);
-      pqxx::result result = get_orders.exec_params(
-        "SELECT product_id, delivery_address FROM orders WHERE delivery_address = $1 ORDER BY product_id DESC LIMIT 1",
-        obj.get_delivery_address());
-      get_orders.commit();
-      int product_id = result[0]["product_id"].as<int>();
-     db::order order2(product_id,obj.get_delivery_address());
-      return order2;
+bool login(db::user_password& obj){
+ try {
+      pqxx::work check(*conn);
+      pqxx::result result = check.exec_params(
+          "SELECT password FROM passwords WHERE phone = $1",
+          obj.get_phone());
+      check.commit();
+      if (result.size() == 0) {
+            return false; // Пользователь не найден
+        }
+      std::string password=(result[0][0].as<std::string>());
 
-    } catch (const pqxx::sql_error &e) {
-      throw std::runtime_error("Ошибка получения заказов пользователя:" +
-                               std::string(e.what()));
+        if(obj.get_password()==password){
+        return true;
+        }
+        else{return false;}
+
+      
+     
+ }
+ catch (const pqxx::sql_error &e) {
+      throw std::runtime_error(std::string(e.what()));
     }
+
 
 }
 };

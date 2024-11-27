@@ -74,7 +74,9 @@ class user {
 
   user(const string &phone) : user_id(0), age(0), gender(""), phone(phone) {}
 
-  user(const int &id,const string &phone) : user_id(id), age(0), gender(""), phone(phone) {}
+
+  user(const int &id, const int &age,const string &phone) : user_id(id), age(age), gender(""), phone(phone) {}
+
 
   user(const int &id, const int &age, const string &gender, const string &phone)
       : user_id(id), age(age), gender(gender), phone(phone) {}
@@ -193,5 +195,22 @@ class content {
 
   int get_order_id() { return order_id; }
   int get_product_id() { return product_id; }
+};
+
+
+class user_password{
+private:
+std::string phone;
+std::string password;
+public:
+user_password() : phone(""), password(""){}
+
+user_password(const std::string& phone,const std::string password):phone(phone),password(password){}
+
+std::string get_phone() {return phone;}
+std::string get_password() {return password;}
+
+void set_phone(const std::string& phone){ this->phone = phone;}
+void set_password(const std::string& password) {this->password=password;}
 };
 }  // namespace db

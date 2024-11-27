@@ -53,110 +53,181 @@ int main(int argc, char** argv) {
   CROW_ROUTE(app, "/api/couriers")
       .methods(crow::HTTPMethod::POST)([&postgres](const crow::request& req) {
         // парсинг json
-        try {
-          if (req.method != crow::HTTPMethod::POST) {
-            return crow::response(405, "Method Not Allowed");
-          }
-
+        int age;
+        string gender;
+        string phone;
+        string active;
+          try {
           auto json = crow::json::load(req.body);
-          if (!json.has("age") || !json.has("gender") || !json.has("phone") ||
-              !json.has("active")) {
-            return crow::response(400, "Missing required fields");
+
+          age = json["age"].i();
+          gender = json["gender"].s();
+          phone = json["phone"].s();
+          active = json["active"].s();
+          if(age==0 || age<10 || gender.empty() || gender.size()>3 || phone.size()>12 || phone.size()<11 || active.empty() || active.size()>3){
+            throw crow::response(crow::status::BAD_REQUEST, "Bad request");
           }
-
-          int age = json["age"].i();
-          string gender = json["gender"].s();
-          string phone = json["phone"].s();
-          string active = json["active"].s();
-
+          }
+        catch (const std::runtime_error& e){
+          return crow::response(crow::status::BAD_REQUEST, "Bad request");
+        }
+        try{
           db::courier courier1(1, age, gender, phone, active);
 
-          postgres.add_courier(courier1);
+          auto succes=postgres.add_courier(courier1);
+          if(!succes){
+             return crow::response(
+              crow::status::BAD_REQUEST,
+              crow::json::wvalue(
+                  {{"message", "Courier already exists"}})); 
+          }
           return crow::response(
-              201,
+              crow::status::CREATED,
               crow::json::wvalue(
                   {{"message", "Courier added"}}));  // Возвращаем JSON ответ
-        } catch (const exception& e) {
-          cerr << "Error: " << e.what() << endl;
-          return crow::response(500, "Internal Server Error");
+        
         }
+         catch (const exception& e) {
+          cerr << "Error: " << e.what() << endl;
+          return crow::response(crow::status::INTERNAL_SERVER_ERROR, "Internal Server Error");
+        }
+      
       });
+
   // обновить статус курьера
   CROW_ROUTE(app, "/api/v1/couriers:id")
       .methods(crow::HTTPMethod::DELETE)([&postgres](const crow::request& req) {
         // парсинг json
+        int courier_id;
+         string active;
         try {
-          if (req.method != crow::HTTPMethod::DELETE) {
-            return crow::response(405, "Method Not Allowed");
-          }
           auto json = crow::json::load(req.body);
-          if (!json.has("active")) {
-            return crow::response(400, "Missing required fields");
-          }
 
-          int courier_id = json["courier_id"].i();
-          string active = json["active"].s();
+          courier_id = json["courier_id"].i();
+          active = json["active"].s();
+           if(courier_id<=0 || active.empty() || active.size()>3){
+            throw crow::response(crow::status::BAD_REQUEST, "Bad request");
+          }
+        }
+           catch ( const std::runtime_error& e){
+          return crow::response(crow::status::BAD_REQUEST, "Bad request");
+        }
+        try{
           db::courier courier1(courier_id, active);
           postgres.update_courier_status(courier1);
           return crow::response(
-              201, crow::json::wvalue(
+              crow::status::OK, crow::json::wvalue(
                        {{"message",
-                         "Courier status updated"}}));  // Возвращаем JSON ответ
-
-        } catch (const exception& e) {
-          cerr << "Error: " << e.what() << endl;
-          return crow::response(500, "Internal Server Error");
+                         "Courier status updated"}})); 
         }
+         catch (const exception& e) {
+          cerr << "Error: " << e.what() << endl;
+          return crow::response(crow::status::INTERNAL_SERVER_ERROR, "Internal Server Error");
+        }
+       
       });
 
   // зарегать пользователя(добавить)
   CROW_ROUTE(app, "/api/v1/register")
       .methods(crow::HTTPMethod::POST)([&postgres](const crow::request& req) {
         // парсинг json
+         int age ;
+         string gender;
+         string phone;
+         string password;
+         bool add;
         try {
-          if (req.method != crow::HTTPMethod::POST) {
-            return crow::response(405, "Method Not Allowed");
-          }
-
           auto json = crow::json::load(req.body);
-          if (!json.has("age") || !json.has("gender") || !json.has("phone")) {
-            return crow::response(400, "Missing required fields");
+         
+          age = json["age"].i();
+          gender = json["gender"].s();
+          phone = json["phone"].s();
+          password = json["password"].s();
+            if(age<=10 || phone.size()>12 || phone.size()<11 || gender.empty() || gender.size()>3 || password.empty() || password.size()>40){
+            throw crow::response(crow::status::BAD_REQUEST, "Bad request");
           }
-
-          int age = json["age"].i();
-          string gender = json["gender"].s();
-          string phone = json["phone"].s();
-
-          db::user user1(1, age, gender, phone);
-
-          postgres.add_user(user1);
-          return crow::response(
-              201, crow::json::wvalue({{"message", "User added"}}));
-        } catch (const exception& e) {
-          cerr << "Error: " << e.what() << endl;
-          return crow::response(500, "Internal Server Error");
         }
+        catch ( const std::runtime_error& e){
+          return crow::response(crow::status::BAD_REQUEST, "Bad request");
+        }
+        try{
+          db::user_password pass1(phone,password);
+          db::user user1(1, age, gender, phone);
+         
+          add = postgres.add_password(pass1);
+          if (!add){
+              return crow::response(
+              crow::status::BAD_REQUEST, crow::json::wvalue({{"message", "User already exists"}}));
+          }
+          auto succes = postgres.add_user(user1);
+          if(!succes){
+             return crow::response(
+              crow::status::BAD_REQUEST,
+              crow::json::wvalue(
+                  {{"message", "User already exists"}})); 
+          }
+          return crow::response(
+              crow::status::CREATED, crow::json::wvalue({{"message", "User added"}}));
+        } 
+        catch (const exception& e) {
+          cerr << "Error: " << e.what() << endl;
+          return crow::response(crow::status::INTERNAL_SERVER_ERROR, "Internal Server Error");
+        }
+       
       });
+//логин пользователя
+CROW_ROUTE(app, "/api/v1/login")
+.methods(crow::HTTPMethod::POST)([&postgres](const crow::request& req) {
+         string phone;
+         string password;
+         bool login;
+         try {
+          auto json = crow::json::load(req.body);
+         
+          phone = json["phone"].s();
+          password = json["password"].s();
+            if( phone.size()<11 || phone.size()>12 || password.empty() || password.size()>40){
+            throw crow::response(crow::status::BAD_REQUEST, "Bad request");
+          }
+        }
+        catch ( const std::runtime_error& e){
+          return crow::response(crow::status::BAD_REQUEST, "Bad request");
+        }
+        try{
+        db::user_password pass(phone,password);
+        login = postgres.login(pass);
+        if (login==false){
+              return crow::response(
+              crow::status::BAD_REQUEST, crow::json::wvalue({{"message", "Incorrect number or password"}}));
+        }
+
+
+
+         if(login==true){
+         return crow::response(
+              crow::status::OK, crow::json::wvalue({{"message", "Hello, user!"}}));
+         }
+         }catch (const exception& e) {
+          cerr << "Error: " << e.what() << endl;
+          return crow::response(crow::status::INTERNAL_SERVER_ERROR, "Internal Server Error");
+        }
+  
+ });
 
   // Отобразить инфо про пользователя
   CROW_ROUTE(app, "/api/v1/profile")
       .methods(crow::HTTPMethod::GET)([&postgres](const crow::request& req) {
         // парсинг json
         try {
-          if (req.method != crow::HTTPMethod::GET) {
-            return crow::response(405, "Method Not Allowed");
-          }
 
           std::string phone;
           auto phone_param = req.url_params.get("phone");
 
-          if (!phone_param) {
-            return crow::response(400, "Missing 'phone' parameter");
-          }
-
           phone = phone_param;
-
-          db::user user1(1, phone);
+          if(phone.size()>12 || phone.size()<11){
+            throw crow::response(crow::status::BAD_REQUEST, "Bad request");
+          }
+          db::user user1(1,34,"", phone);
           auto user_info = postgres.get_info_user(user1);
           if (user_info.has_value()) {
             crow::json::wvalue responce_data{};
@@ -164,13 +235,17 @@ int main(int argc, char** argv) {
             responce_data["age"] = user_info.value().get_age();
             responce_data["gender"] = user_info.value().get_gender();
             responce_data["phone"] = user_info.value().get_phone();
-            return crow::response(200, responce_data);
+            return crow::response(crow::status::OK, responce_data);
           } else {
-            return crow::response(404, "User not found");
+            return crow::response(crow::status::NOT_FOUND, "User not found");
           }
-        } catch (const exception& e) {
+        }
+         catch ( const std::runtime_error& e){
+          return crow::response(crow::status::BAD_REQUEST, "Bad request");
+        }
+         catch (const exception& e) {
           cerr << "Error: " << e.what() << endl;
-          return crow::response(500, "Internal Server Error");
+          return crow::response(crow::status::INTERNAL_SERVER_ERROR, "Internal Server Error");
         }
       });
 
@@ -179,48 +254,57 @@ int main(int argc, char** argv) {
   // изменить инфо о курьере
   CROW_ROUTE(app, "/api/v1/couriers:id")
       .methods(crow::HTTPMethod::PATCH)([&postgres](const crow::request& req) {
+        int courier_id;
+        int age;
+        string gender;
+        string phone;
+        string active;
         try {
-          if (req.method != crow::HTTPMethod::PATCH) {
-            return crow::response(405, "Method Not Allowed");
-          }
           auto json = crow::json::load(req.body);
-          if (!json.has("courier_id") || !json.has("age") ||
-              !json.has("gender") || !json.has("phone") ||
-              !json.has("active")) {
-            return crow::response(400, "Missing required fields");
+    
+          courier_id = json["courier_id"].i();
+          age = json["age"].i();
+          gender = json["gender"].s();
+          phone = json["phone"].s();
+          active = json["active"].s();
+
+          if(courier_id <=0 || age ==0 || age <10 || gender.empty() || gender.size()>3 || phone.size()>12 || phone.size()<11 || active.empty() || active.size()>3){
+              return crow::response(crow::status::BAD_REQUEST, "Bad request");
           }
-          int courier_id = json["courier_id"].i();
-          int age = json["age"].i();
-          string gender = json["gender"].s();
-          string phone = json["phone"].s();
-          string active = json["active"].s();
+        }
+           catch ( const std::runtime_error& e){
+          return crow::response(crow::status::BAD_REQUEST, "Bad request");
+        }
+        try {
           db::courier courier1(courier_id, age, gender, phone, active);
           postgres.update_courier(courier1);
           return crow::response(
-              201, crow::json::wvalue({{"message", "Courier updated"}}));
-        } catch (const exception& e) {
-          cerr << "Error: " << e.what() << endl;
-          return crow::response(500, "Internal Server Error");
+              crow::status::OK, crow::json::wvalue({{"message", "Courier updated"}}));
         }
+         catch (const exception& e) {
+          cerr << "Error: " << e.what() << endl;
+          return crow::response(crow::status::INTERNAL_SERVER_ERROR, "Internal Server Error");
+        }
+        
       });
 
   // посмотреть инфо о продукте
   CROW_ROUTE(app, "/api/v1/product:id")
       .methods(crow::HTTPMethod::GET)([&postgres](const crow::request& req) {
+         int product_id;
         try {
-          if (req.method != crow::HTTPMethod::GET) {
-            return crow::response(405, "Method Not Allowed");
-          }
-
-          int product_id;
+         
           auto id_param = req.url_params.get("product_id");
 
-          if (!id_param) {
-            return crow::response(400, "Missing 'product_id' parameter");
-          }
-
           product_id = std::stoi(id_param);
-
+            if(product_id<=0){
+            return crow::response(crow::status::BAD_REQUEST, "Bad request");
+            }
+        }
+        catch ( const std::runtime_error& e){
+          return crow::response(crow::status::BAD_REQUEST, "Bad request");
+        }
+        try{
           db::product product1(product_id);
           auto product_info = postgres.get_info_product(product1);
           if (product_info.has_value()) {
@@ -229,146 +313,183 @@ int main(int argc, char** argv) {
             responce_data["name"] = product_info.value().get_name();
             responce_data["price"] = product_info.value().get_price();
             responce_data["count"] = product_info.value().get_count();
-            return crow::response(200, responce_data);
+            return crow::response(crow::status::FOUND, responce_data);
           } else {
-            return crow::response(404, "Product not found");
+            return crow::response(crow::status::NOT_FOUND, "Product not found");
           }
-        } catch (const exception& e) {
+        } 
+        catch (const exception& e) {
           cerr << "Error: " << e.what() << endl;
-          return crow::response(500, "Internal Server Error");
+          return crow::response(crow::status::INTERNAL_SERVER_ERROR, "Internal Server Error");
         }
+        
       });
 
   // изменить данные о продукте
   CROW_ROUTE(app, "/api/v1/product:id")
       .methods(crow::HTTPMethod::POST)([&postgres](const crow::request& req) {
+        int product_id;
+        string name;
+        int price ;
+        int count;
         try {
-          if (req.method != crow::HTTPMethod::POST) {
-            return crow::response(405, "Method Not Allowed");
-          }
           auto json = crow::json::load(req.body);
-          if (!json.has("product_id") || !json.has("name") ||
-              !json.has("price") || !json.has("count")) {
-            return crow::response(400, "Missing required fields");
+         
+          product_id = json["product_id"].i();
+          name = json["name"].s();
+          price = json["price"].i();
+          count = json["count"].i();
+          if(product_id<=0 || name.size()>30 || name.empty() || price<0 || count<0)
+          {
+                      return crow::response(crow::status::BAD_REQUEST, "Bad request");
           }
-          int product_id = json["product_id"].i();
-          string name = json["name"].s();
-          int price = json["price"].i();
-          int count = json["count"].i();
+        }
+          catch ( const std::runtime_error& e){
+          return crow::response(crow::status::BAD_REQUEST, "Bad request");
+        }
+        try{
           db::product product1(product_id, name, price, count);
           postgres.update_product(product1);
           return crow::response(
-              201, crow::json::wvalue({{"message", "Product updated"}}));
-        } catch (const exception& e) {
-          cerr << "Error: " << e.what() << endl;
-          return crow::response(500, "Internal Server Error");
+              crow::status::OK, crow::json::wvalue({{"message", "Product updated"}}));
         }
+         catch (const exception& e) {
+          cerr << "Error: " << e.what() << endl;
+          return crow::response(crow::status::INTERNAL_SERVER_ERROR, "Internal Server Error");
+        }
+       
       });
  // удалить продукт
   CROW_ROUTE(app, "/api/v1/product:id")
       .methods(crow::HTTPMethod::PATCH)([&postgres](const crow::request& req) {
+        int product_id;
         try {
-          if (req.method != crow::HTTPMethod::PATCH) {
-            return crow::response(405, "Method Not Allowed");
-          }
           auto json = crow::json::load(req.body);
-          if (!json.has("product_id")) {
-            return crow::response(400, "Missing required fields");
+         
+          product_id = json["product id"].i();
+          if(product_id<=0){
+                      return crow::response(crow::status::BAD_REQUEST, "Bad request");
           }
-          int product_id = json["product id"].i();
+        }
+        catch ( const std::runtime_error& e){
+          return crow::response(crow::status::BAD_REQUEST, "Bad request");
+        }
+        try{
           db::product product1(product_id);
           postgres.update_product_status(product1);
 
           return crow::response(
-              201, crow::json::wvalue({{"message", "Product deleted"}}));
-        } catch (const exception& e) {
-          return crow::response(500, "Internal Server Error");
+              crow::status::OK, crow::json::wvalue({{"message", "Product deleted"}}));
+        } 
+        catch (const exception& e) {
+          return crow::response(crow::status::INTERNAL_SERVER_ERROR, "Internal Server Error");
         }
+       
       });
 
-  // Изменить информацию в профиле о пользователе
+  // Изменить информацию в профиле о пользователе  // мб добавить еще старый номер, по которому будет происходить обновление
   CROW_ROUTE(app, "/api/v1/profile")
       .methods(crow::HTTPMethod::POST)([&postgres](const crow::request& req) {
-        // парсинг json
+        int age;
+        string phone;
+        string old_phone;
         try {
-          if (req.method != crow::HTTPMethod::POST) {
-            return crow::response(405, "Method Not Allowed");
-          }
           auto json = crow::json::load(req.body);
-          if (!json.has("age") || !json.has("gender") || !json.has("phone")) {
-            return crow::response(400, "Missing required fields");
-          }
+         
 
-          int user_id = json["user_id"].i();
-          int age = json["age"].i();
-          string gender = json["gender"].s();
-          string phone = json["phone"].s();
-          db::user user1(user_id, age, gender, phone);
-          postgres.update_user(user1);
+          age = json["age"].i();
+          phone = json["phone"].s();
+          old_phone = json["old_phone"].s();
+       
+          if(age<10  || phone.size()>12 || phone.size()<11 || old_phone.size()>12 || old_phone.size()<11){
+            return crow::response(crow::status::BAD_REQUEST, "Bad request");
+          }
+        }
+        catch ( const std::runtime_error& e){
+          return crow::response(crow::status::BAD_REQUEST, "Bad request");
+        }
+        try{
+          db::user user1(1,age,"", phone);
+          postgres.update_user(user1,old_phone);
 
           return crow::response(
-              201, crow::json::wvalue({{"message", "User data updated"}}));
-        } catch (const exception& e) {
-          cerr << "Error: " << e.what() << endl;
-          return crow::response(500, "Internal Server Error");
+              crow::status::OK, crow::json::wvalue({{"message", "User data updated"}}));
         }
+         catch (const exception& e) {
+          cerr << "Error: " << e.what() << endl;
+          return crow::response(crow::status::INTERNAL_SERVER_ERROR, "Internal Server Error");
+        }
+         
       });
 
-  // Создать заказ
+  // Создать заказ  // доделать
   CROW_ROUTE(app, "/api/v1/order")
       .methods(crow::HTTPMethod::POST)([&postgres](const crow::request& req) {
-        // парсинг json
+       string delivery_address;
+      vector<int> products_ids;
         try {
-          if (req.method != crow::HTTPMethod::POST) {
-            return crow::response(405, "Method Not Allowed");
-          }
           auto json = crow::json::load(req.body);
-          if (!json.has("delivery address") || !json.has("products")) {
-            return crow::response(400, "Missing required fields");
-          }
+          
           // во фронте добавить проверку, что у нас будет не пустой заказ
-          string delivery_address = json["delivery address"].s();
+          delivery_address = json["delivery_address"].s();
           const auto& products_json = json["products"];
-          vector<int> products_ids;
+        
             for (const auto& product_data : products_json) {
                 products_ids.push_back(product_data.i());
             }
-
-          db::order order1(0, delivery_address);
-          postgres.add_order(order1);
-          auto data = postgres.get_last_order(order1);
-          if(!data.has_value()){
-            return crow::response(500,"Error retrieving last order.");
+          if(products_ids.empty() || delivery_address.size()>80 || delivery_address.empty()){
+                      return crow::response(crow::status::BAD_REQUEST, "Bad request");
           }
-          auto& data_last = *data;
+        }
+        catch ( const std::runtime_error& e){
+          return crow::response(crow::status::BAD_REQUEST, "Bad request");
+        }
+        int order_id;
+        try{
+          db::order order1(0, delivery_address);
+          auto maybe_order_id =postgres.add_order(order1);
+          if(!maybe_order_id.has_value()){
+              return crow::response(crow::status::INTERNAL_SERVER_ERROR,"Error retrieving last order.");
+          }
+          order_id=*maybe_order_id;
+          if(order_id <=0){
+            return crow::response(crow::status::INTERNAL_SERVER_ERROR,"Error retrieving last order.");
+          }
+
+          //вставить логику user_action отправляем номер телефона и по нему ищем user_id телефона в users, и создаем действие.
           for(size_t i=0;i<products_ids.size();i++){
-          db::content content1(data_last.get_order_id(),products_ids[i]);
+          db::content content1(order_id,products_ids[i]);
           postgres.add_content_item(content1);
           }
           return crow::response(
-              201,
+              crow::status::CREATED,
               crow::json::wvalue({{"message", "Order succesfully added"}}));
 
-        } catch (const exception& e) {
-          cerr << "Error: " << e.what() << endl;
-          return crow::response(500, "Internal Server Error");
         }
+         catch (const exception& e) {
+          cerr << "Error: " << e.what() << endl;
+          return crow::response(crow::status::INTERNAL_SERVER_ERROR, "Internal Server Error");
+        }
+        
       });
 
 
   // посмотреть инфо о заказе
  CROW_ROUTE(app, "/api/v1/order")
       .methods(crow::HTTPMethod::GET)([&postgres](const crow::request& req) {
+        int order_id;
     try {
-      if (req.method != crow::HTTPMethod::GET) {
-        return crow::response(405, "Method Not Allowed");
-      }
-      int order_id;
       auto id_param = req.url_params.get("order_id");
-      if (!id_param) {
-        return crow::response(400, "Missing 'product_id' parameter");
-      }
+    
       order_id = std::stoi(id_param);
+      if(order_id<=0){
+        return crow::response(crow::status::BAD_REQUEST, "Bad request");
+      }
+    }
+    catch ( const std::runtime_error& e){
+          return crow::response(crow::status::BAD_REQUEST, "Bad request");
+      }
+      try{
       db::order order1(order_id);
       auto order_info = postgres.get_info_order(order1);
       if (order_info.has_value()) {
@@ -379,22 +500,18 @@ int main(int argc, char** argv) {
         responce_data["delivery address"] =
             order_info.value().get_delivery_address();
         responce_data["status"] = order_info.value().get_status();
-         return crow::response(200, responce_data);
+         return crow::response(crow::status::FOUND, responce_data);
       }
        else{
         return crow::response(
-            201, crow::json::wvalue({{"message", "Order not found"}}));
+            crow::status::NOT_FOUND, crow::json::wvalue({{"message", "Order not found"}}));
        }
       }
       catch (const exception& e) {
         cerr << "Error: " << e.what() << endl;
-        return crow::response(500, "Internal Server Error");
+        return crow::response(crow::status::INTERNAL_SERVER_ERROR, "Internal Server Error");
       }
     });
-
-
-
-
 
 
 
@@ -414,33 +531,4 @@ int main(int argc, char** argv) {
 
 
 
-void Guest() {
-    std::cout << "1.Зарегистрироваться" << std::endl;  //+
-    std::cout << "2.Залогиниться;" << std::endl;
-}
 
-void User() {
-    std::cout << "1.Посмотреть ифнормацию о профиле" << std::endl;  //+
-    std::cout << "2.Изменить ифнормацию в профиле;" << std::endl;   //+
-    std::cout << "3.Посмотреть каталог товаров;" << std::endl;      //+
-    std::cout << "4.Посмотреть информацию о товаре;" << std::endl;  //+
-    std::cout << "5.Добавить товар в корзину;" << std::endl;
-    std::cout << "6.Удалить товар из корзины;" << std::endl;
-    std::cout << "7.Посмотреть корзину;" << std::endl;
-    std::cout << "8.Сделать заказ;" << std::endl;                   //+
-    std::cout << "9.Посмотреть информацию о заказе;" << std::endl;  //+
-    std::cout << "10.Отменить заказ;" << std::endl;                 //+
-}
-
-void Admin() {
-    std::cout << "1.Залогиниться" << std::endl;
-    std::cout << "2.Добавить курьера;" << std::endl;               //+
-    std::cout << "3.Уволить курьера;" << std::endl;                //+
-    std::cout << "4.Изменить ифнормацию о курьере;" << std::endl;  //+
-    std::cout << "5.Передать заказ курьеру;" << std::endl;         //+
-    std::cout << "6.Добавить продукт;" << std::endl;               //+
-    std::cout << "7.Изменить данные о продукте;" << std::endl;     //+
-    std::cout << "8.Удалить продукт;" << std::endl;                //+
-    std::cout << "9.Изменить статус заказа;" << std::endl;         //+
-    std::cout << "10.Выйти из программы;" << std::endl;            //+
-}

@@ -2,9 +2,6 @@
 
 
 namespace api{
-// class user{
-
-// }
 
 
 

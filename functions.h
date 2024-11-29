@@ -137,14 +137,24 @@ class DB {
     }
   }
 
-  void add_courier_action(db::courier_action &obj) {
+  bool add_courier_action(db::courier_action &obj) {
     try {
+      pqxx::work check(*conn);
+      pqxx::result check_result = check.exec_params(
+          "SELECT EXISTS (SELECT 1 FROM courier_actions WHERE order_id = $1 AND courier_id = $2 AND action = $3)",
+          obj.get_order_id(),obj.get_courier_id(),obj.get_action());
+      check.commit();
+      if (check_result[0][0].as<bool>()) {
+        return false;
+      } else {
       pqxx::work transfer(*conn);
       transfer.exec_params(
           "INSERT INTO courier_actions (action, order_id, courier_id) VALUES "
           "($1, $2, $3)",
           obj.get_action(), obj.get_order_id(), obj.get_courier_id());
       transfer.commit();
+      return true;
+      }
     } catch (const pqxx::sql_error &e) {
       throw std::runtime_error("Ошибка создания действия курьера:" +
                                std::string(e.what()));
@@ -529,8 +539,8 @@ class DB {
       pqxx::work get_orders(*conn);
       pqxx::result result = get_orders.exec_params(
           "SELECT * FROM orders WHERE order_id IN (SELECT order_id FROM "
-          "user_actions WHERE user_id = $1)",
-          obj.get_user_id());
+          "user_actions WHERE user_id IN (SELECT user_id FROM users WHERE phone = $1))",
+          obj.get_phone());
       get_orders.commit();
       vector<db::order> orders;
       for (const auto &row : result) {
@@ -576,4 +586,6 @@ bool login(db::user_password& obj){
 
 
 }
+
+
 };

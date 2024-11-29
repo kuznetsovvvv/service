@@ -42,7 +42,7 @@ class courier {
 
 class courier_action {
  private:
-  string action;  // get //delivered
+  string action;  // transfer //deliver
   int order_id;
   int courier_id;
 
@@ -147,7 +147,7 @@ class order {
   string creation_time;
   string time;
   string delivery_address;
-  string status;  // accepted  // transfer // delivered // canceled
+  string status;  // accept  // transfer // deliver // cancel
  public:
   order()
       : order_id(0),

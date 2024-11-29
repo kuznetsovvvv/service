@@ -387,7 +387,7 @@ CROW_ROUTE(app, "/api/v1/login")
        
       });
 
-  // Изменить информацию в профиле о пользователе  // мб добавить еще старый номер, по которому будет происходить обновление
+  // Изменить информацию в профиле о пользователе  
   CROW_ROUTE(app, "/api/v1/profile")
       .methods(crow::HTTPMethod::POST)([&postgres](const crow::request& req) {
         int age;
@@ -422,29 +422,33 @@ CROW_ROUTE(app, "/api/v1/login")
          
       });
 
-  // Создать заказ  // доделать
+  // Создать заказ  
   CROW_ROUTE(app, "/api/v1/order")
       .methods(crow::HTTPMethod::POST)([&postgres](const crow::request& req) {
        string delivery_address;
+       string old_phone;
       vector<int> products_ids;
+      int user_id;
+      int order_id;
         try {
           auto json = crow::json::load(req.body);
           
           // во фронте добавить проверку, что у нас будет не пустой заказ
+          old_phone=json["old_phone"].s();
           delivery_address = json["delivery_address"].s();
           const auto& products_json = json["products"];
         
             for (const auto& product_data : products_json) {
                 products_ids.push_back(product_data.i());
             }
-          if(products_ids.empty() || delivery_address.size()>80 || delivery_address.empty()){
+          if(products_ids.empty() || delivery_address.size()>80 || delivery_address.empty() || old_phone.size()>12 || old_phone.size()<11){
                       return crow::response(crow::status::BAD_REQUEST, "Bad request");
           }
         }
         catch ( const std::runtime_error& e){
           return crow::response(crow::status::BAD_REQUEST, "Bad request");
         }
-        int order_id;
+
         try{
           db::order order1(0, delivery_address);
           auto maybe_order_id =postgres.add_order(order1);
@@ -455,7 +459,15 @@ CROW_ROUTE(app, "/api/v1/login")
           if(order_id <=0){
             return crow::response(crow::status::INTERNAL_SERVER_ERROR,"Error retrieving last order.");
           }
-
+          db::user user1(old_phone);
+          auto user_info = postgres.get_info_user(user1);
+          if (user_info.has_value()) {
+            user_id = user_info.value().get_user_id();
+          } else {
+            return crow::response(crow::status::NOT_FOUND, "User not found");
+          }
+          db::user_action user_action1("create",order_id,user_id);
+          postgres.add_user_action(user_action1);
           //вставить логику user_action отправляем номер телефона и по нему ищем user_id телефона в users, и создаем действие.
           for(size_t i=0;i<products_ids.size();i++){
           db::content content1(order_id,products_ids[i]);
@@ -498,7 +510,7 @@ CROW_ROUTE(app, "/api/v1/login")
         responce_data["creation_time"] = order_info.value().get_creation_time();
         responce_data["time"] = order_info.value().get_time();
         responce_data["delivery address"] =
-            order_info.value().get_delivery_address();
+        order_info.value().get_delivery_address();
         responce_data["status"] = order_info.value().get_status();
          return crow::response(crow::status::FOUND, responce_data);
       }
@@ -516,19 +528,103 @@ CROW_ROUTE(app, "/api/v1/login")
 
 
 
+//передать заказ курьеру courier_action, соответственно изменив статус заказа update_order_status
+ CROW_ROUTE(app, "/api/v1/order")
+      .methods(crow::HTTPMethod::PATCH)([&postgres](const crow::request& req) {
+        int order_id;
+        int courier_id;
+        string action;
+        try {
+          auto json = crow::json::load(req.body);
+          
+          order_id=json["order_id"].i();
+          courier_id = json["courier_id"].i();
+          action=json["action"].s();
+          if(courier_id<=0 || order_id<=0 || action.empty() || action.size()>20){
+         return crow::response(crow::status::BAD_REQUEST, "Bad request");
+        }
+      }
+      catch ( const std::runtime_error& e){
+          return crow::response(crow::status::BAD_REQUEST, "Bad request");
+      }
+      try{
+        if(action=="transfer"){
+       db::order order1(order_id," ","transfer");
+       db::courier_action courier_action1("transfer",order_id,courier_id);
+       auto add = postgres.add_courier_action(courier_action1);
+       auto succes = postgres.update_order_status(order1);
+        if (!succes || add==false){
+              return crow::response(
+              crow::status::BAD_REQUEST, crow::json::wvalue({{"message", "Courier action didnt created."}}));
+          }
+          else{
+            return crow::response(crow::status::OK, crow::json::wvalue({{"message", "Courier action 'transfer' created and order status updated succesfully added"}}));
+          }
+        }
+        else if(action=="deliver"){
+           db::order order1(order_id," ","deliver");
+           db::courier_action courier_action1("deliver",order_id,courier_id);
+           auto add = postgres.add_courier_action(courier_action1);
+           auto succes = postgres.update_order_status(order1);
+        if (!succes || add==false){
+              return crow::response(
+              crow::status::BAD_REQUEST, crow::json::wvalue({{"message", "Courier action didnt created."}}));
+          }
+          else{
+            return crow::response(crow::status::OK, crow::json::wvalue({{"message", "Courier action 'deliver' created and order status updated succesfully added"}}));
+          }
+
+        }
+  
+      }
+      catch (const exception& e) {
+        cerr << "Error: " << e.what() << endl;
+        return crow::response(crow::status::INTERNAL_SERVER_ERROR, "Internal Server Error");
+      }
+
+    });
 
 
-
-
-
-
-
+//все заказы прислать // доделать
+// CROW_ROUTE(app, "/api/v1/allorder")
+//       .methods(crow::HTTPMethod::GET)([&postgres](const crow::request& req) {
+//       string phone;
+//     try {
+//       auto id_param = req.url_params.get("phone");
+    
+//       phone= std::atoi(id_param);
+//       if(phone.size()<11 || phone.size()>12){
+//         return crow::response(crow::status::BAD_REQUEST, "Bad request");
+//       }
+//     }
+//     catch ( const std::runtime_error& e){
+//           return crow::response(crow::status::BAD_REQUEST, "Bad request");
+//       }
+//       try{
+//       db::user user1(phone);
+//       auto order_info = postgres.get_orders(user1);
+//       if (order_info.has_value()) {
+//         crow::json::wvalue responce_data{};
+//         responce_data["order_id"] = order_info.value().get_order_id();
+//         responce_data["creation_time"] = order_info.value().get_creation_time();
+//         responce_data["time"] = order_info.value().get_time();
+//         responce_data["delivery address"] =
+//         order_info.value().get_delivery_address();
+//         responce_data["status"] = order_info.value().get_status();
+//          return crow::response(crow::status::FOUND, responce_data);
+//       }
+//        else{
+//         return crow::response(
+//             crow::status::NOT_FOUND, crow::json::wvalue({{"message", "Orders not found"}}));
+//        }
+//       }
+//       catch (const exception& e) {
+//         cerr << "Error: " << e.what() << endl;
+//         return crow::response(crow::status::INTERNAL_SERVER_ERROR, "Internal Server Error");
+//       }
+//     });
 
 
     app.port(18080).run();
     return 0;
 }
-
-
-
-

@@ -169,11 +169,11 @@ class order {
   order(const int &id, const string &delivery_address, const string &status)
       : order_id(id), delivery_address(delivery_address), status(status) {}
 
-  int get_order_id() { return order_id; }
-  std::string get_creation_time() { return creation_time; }
-  std::string get_time() { return time; }
-  std::string get_delivery_address() { return delivery_address; }
-  std::string get_status() { return status; }
+  int get_order_id() const { return order_id; }
+  std::string get_creation_time() const { return creation_time; }
+  std::string get_time() const { return time; }
+  std::string get_delivery_address() const { return delivery_address; }
+  std::string get_status() const { return status; }
 
   void set_order_id(int id){this->order_id=id;}
   void set_creation_time(const std::string& creation_time) {this->creation_time=creation_time;}

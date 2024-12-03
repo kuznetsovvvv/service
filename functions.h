@@ -1,4 +1,5 @@
-
+#ifndef FUNCTIONS_H
+#define FUNCTIONS_H
 #include <stdio.h>
 
 #include <boost/program_options.hpp>
@@ -13,7 +14,6 @@
 #include "api_namespace.h"
 #include "db_namespace.h"
 using namespace db;
-using namespace api;
 using namespace std;
 
 class DB {
@@ -161,14 +161,24 @@ class DB {
     }
   }
 
-  void add_user_action(db::user_action &obj) {
+ bool add_user_action(db::user_action &obj) {
     try {
+    pqxx::work check(*conn);
+      pqxx::result check_result = check.exec_params(
+          "SELECT EXISTS (SELECT 1 FROM user_actions WHERE order_id = $1 AND user_id = $2 AND action = $3)",
+          obj.get_order_id(),obj.get_user_id(),obj.get_action());
+      check.commit();
+      if (check_result[0][0].as<bool>()) {
+     return false;
+      } else {
       pqxx::work transfer(*conn);
       transfer.exec_params(
           "INSERT INTO user_actions (action, order_id, user_id) VALUES ($1, "
           "$2, $3)",
           obj.get_action(), obj.get_order_id(), obj.get_user_id());
       transfer.commit();
+      return true;
+      }
     } catch (const pqxx::sql_error &e) {
       throw std::runtime_error("Ошибка создания действия пользователя:" +
                                std::string(e.what()));
@@ -268,7 +278,7 @@ class DB {
       pqxx::work check(*conn);
       pqxx::result result = check.exec_params(
           "SELECT EXISTS (SELECT 1 FROM products WHERE product_id = $1)",
-          obj.get_name());
+          obj.get_product_id());
       check.commit();
       if (result[0][0].as<bool>()) {
         pqxx::work update_status(*conn);
@@ -380,7 +390,7 @@ class DB {
       if (result[0][0].as<bool>()) {
         pqxx::work get(*conn);
         pqxx::result res = get.exec_params(
-            "SELECT * FROM products WHERE name=$1", obj.get_name());
+            "SELECT * FROM products WHERE name = $1", obj.get_name());
         get.commit();
         db::product product;
         product.set_product_id(res[0][0].as<int>());
@@ -539,20 +549,24 @@ class DB {
       pqxx::work get_orders(*conn);
       pqxx::result result = get_orders.exec_params(
           "SELECT * FROM orders WHERE order_id IN (SELECT order_id FROM "
-          "user_actions WHERE user_id IN (SELECT user_id FROM users WHERE phone = $1))",
+          "user_actions WHERE user_id IN (SELECT user_id FROM users WHERE phone = $1)) ORDER BY creation_time DESC, status",
           obj.get_phone());
       get_orders.commit();
       vector<db::order> orders;
-      for (const auto &row : result) {
-        db::order order;
-        order.set_order_id(result[0][0].as<int>());
-        order.set_creation_time(result[0][1].as<std::string>());
-        order.set_time(result[0][2].as<std::string>());
-        order.set_delivery_address(result[0][3].as<std::string>());
-        order.set_status(result[0][4].as<std::string>());
-        orders.push_back(order);
-      }
-      return orders;
+      for (const auto& row : result) {
+            db::order order;
+            order.set_order_id(row["order_id"].as<int>()); // Правильный доступ к столбцам по имени
+            order.set_creation_time(row["creation_time"].as<std::string>());
+            order.set_time(row["time"].as<std::string>());
+            order.set_delivery_address(row["delivery_address"].as<std::string>());
+            order.set_status(row["status"].as<std::string>());
+            orders.push_back(order);
+        }
+         if (orders.empty()) {
+            return std::nullopt;
+        } else {
+            return orders;
+        }
 
     } catch (const pqxx::sql_error &e) {
       throw std::runtime_error("Ошибка получения заказов пользователя:" +
@@ -588,4 +602,36 @@ bool login(db::user_password& obj){
 }
 
 
+//удалить заказ(cancel пользователь)
+bool cancel_order(db::order & obj){
+try {
+       pqxx::work check(*conn);
+      pqxx::result result = check.exec_params(
+          "SELECT EXISTS (SELECT 1 FROM orders WHERE order_id = $1 AND status = $2)",
+          obj.get_order_id(),"cancel");
+      check.commit();
+
+
+      if (!result[0][0].as<bool>()) {
+        pqxx::work update_data(*conn);
+        update_data.exec_params(
+            "UPDATE orders SET time=CURRENT_TIMESTAMP(2), status=$1 WHERE order_id=$2",
+            "cancel", obj.get_order_id());
+             update_data.commit();
+        return true;
+      } else {
+        return false;
+      }
+     
+ }
+ catch (const pqxx::sql_error &e) {
+      throw std::runtime_error(std::string(e.what()));
+    }
+
+
+
+}
+
+
 };
+#endif

@@ -32,7 +32,6 @@ class API {
   void setupRoutes(DB& postgres) {
     CROW_ROUTE(app, "/api/couriers")
         .methods(crow::HTTPMethod::POST)([&postgres](const crow::request& req) {
-          // парсинг json
           int age;
           string gender;
           string phone;
@@ -77,7 +76,6 @@ class API {
     CROW_ROUTE(app, "/api/v1/couriers")
         .methods(
             crow::HTTPMethod::DELETE)([&postgres](const crow::request& req) {
-          // парсинг json
           int courier_id;
           string active;
           try {
@@ -107,7 +105,6 @@ class API {
     // зарегать пользователя(добавить)
     CROW_ROUTE(app, "/api/v1/register")
         .methods(crow::HTTPMethod::POST)([&postgres](const crow::request& req) {
-          // парсинг json
           int age;
           string gender;
           string phone;
@@ -193,6 +190,7 @@ class API {
                                   "Internal Server Error");
           }
         });
+
     // логин админа
     CROW_ROUTE(app, "/api/v1/login")
         .methods(
@@ -234,7 +232,6 @@ class API {
     // Отобразить инфо про пользователя
     CROW_ROUTE(app, "/api/v1/profile")
         .methods(crow::HTTPMethod::GET)([&postgres](const crow::request& req) {
-          // парсинг json
           try {
             std::string phone;
             auto phone_param = req.url_params.get("phone");
@@ -449,7 +446,6 @@ class API {
           try {
             auto json = crow::json::load(req.body);
 
-            // во фронте добавить проверку, что у нас будет не пустой заказ
             old_phone = json["old_phone"].s();
             delivery_address = json["delivery_address"].s();
             const auto& products_json = json["products"];

@@ -22,7 +22,7 @@
 
 ## Схема базы данных(PostgreSQL)
 ![image](https://github.com/user-attachments/assets/79bf54da-5f24-408d-a823-dbc24628352b)
-|:----:|Рис. 1
+<kbd>Рис.1</kbd>
 
 В разработанном веб-приложении используется HTTP-протокол для связи между фронтендом на Svelte и бэкендом на C++ (с использованием библиотеки Crow). 
 JavaScript скрипты на Svelte отправляют HTTP-запросы (GET, POST, PATCH, DELETE) к серверу, реализованному на C++ с Crow.
